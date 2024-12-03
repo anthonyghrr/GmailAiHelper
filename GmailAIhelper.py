@@ -10,7 +10,6 @@ import pickle
 import os
 import json
 import re
-import hashlib
 import redis
 import time
 
@@ -55,11 +54,8 @@ def list_emails(service, query=None):
 # Fetch email details (subject, sender, date, message_id_header)
 def get_email_details(service, message_id):
     try:
-        # Fetch email metadata from Gmail API
         message = service.users().messages().get(userId='me', id=message_id, format='metadata').execute()
         headers = message.get('payload', {}).get('headers', [])
-
-        # Use safe extraction of headers with default values
         subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "No Subject")
         sender = next((h['value'] for h in headers if h['name'] == 'From'), "Unknown Sender")
         date = next((h['value'] for h in headers if h['name'] == 'Date'), None)
@@ -171,6 +167,43 @@ def display_result(sender, summary, category, priority, response_required):
     print(f"{Fore.LIGHTWHITE_EX}Response Required: {Fore.LIGHTGREEN_EX if response_required == 'Yes' else Fore.RED}{response_required}")
     print(f"{Fore.LIGHTBLACK_EX}{'-' * 50}")
 
+# Generate only the visualizations
+def generate_visualizations(processed_emails):
+    category_counts = defaultdict(int)
+    response_counts_yes = defaultdict(int)
+    response_counts_no = defaultdict(int)
+
+    for email in processed_emails:
+        category_counts[email['category']] += 1
+        if email['response_required'] == 'Yes':
+            response_counts_yes[email['priority']] += 1
+        else:
+            response_counts_no[email['priority']] += 1
+
+    # Pie Chart for Category Distribution
+    plt.figure(figsize=(8, 6))
+    plt.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=140)
+    plt.axis('equal')
+    plt.title('Email Category Distribution')
+    plt.show()
+
+    # Stacked Bar Chart for Response Requirement by Priority
+    response_priorities = ['Urgent', 'Important', 'Normal']
+    response_counts_yes_list = [response_counts_yes[priority] for priority in response_priorities]
+    response_counts_no_list = [response_counts_no[priority] for priority in response_priorities]
+
+    x = range(len(response_priorities))
+    plt.figure(figsize=(10, 6))
+    plt.bar(x, response_counts_yes_list, label='Requires Response', color='lightblue')
+    plt.bar(x, response_counts_no_list, bottom=response_counts_yes_list, label='No Response Needed', color='lightgrey')
+    plt.xlabel('Priority Level')
+    plt.ylabel('Number of Emails')
+    plt.title('Response Requirement by Priority Level')
+    plt.xticks(x, response_priorities)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
 # Main function to process emails
 def main():
     print(f"{Fore.LIGHTGREEN_EX}Connecting to Gmail...")
@@ -213,6 +246,9 @@ def main():
                 'response_required': response_required,
                 'date': date
             })
+
+    # Generate visualizations: pie chart and stacked bar chart
+    generate_visualizations(processed_emails)
 
     current_ts = int(time.time())
     redis_client.set('last_processed_ts', current_ts)
