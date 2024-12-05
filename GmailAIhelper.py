@@ -56,10 +56,33 @@ def get_email_details(service, message_id):
     try:
         message = service.users().messages().get(userId='me', id=message_id, format='metadata').execute()
         headers = message.get('payload', {}).get('headers', [])
-        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "No Subject")
-        sender = next((h['value'] for h in headers if h['name'] == 'From'), "Unknown Sender")
-        date = next((h['value'] for h in headers if h['name'] == 'Date'), None)
-        message_id_header = next((h['value'] for h in headers if h['name'] == 'Message-ID'), None)
+        subject = None
+        for h in headers:
+            if h['name'] == 'Subject':
+                subject = h['value']
+                break
+        if subject is None:
+            subject = "No Subject"
+
+        sender = None
+        for h in headers:
+            if h['name'] == 'From':
+                sender = h['value']
+                break
+        if sender is None:
+            sender = "Unknown Sender"
+
+        date = None
+        for h in headers:
+            if h['name'] == 'Date':
+                date = h['value']
+                break
+
+        message_id_header = None
+        for h in headers:
+            if h['name'] == 'Message-ID':
+                message_id_header = h['value']
+                break
         
         if not message_id_header:
             return None  # Skip emails without Message-ID
